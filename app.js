@@ -1,9 +1,10 @@
 (() => {
  'use strict';
  const $ = s => document.querySelector(s), particles = window.PARTICLES;
- let atlasMode='relations', relationAtlas=null, relationFilter='all';
+ let atlasMode='explore', relationAtlas=null, explorer=null, explorerState=null, relationFilter='all', restoringRoute=true;
  const graphEdges=window.RELATION_EDGES, graphTypes=window.RELATION_TYPES;
- let current = particles.find(p=>p.id===location.hash.slice(1)) || particles[0], playing=!matchMedia('(prefers-reduced-motion: reduce)').matches, zoom=1, time=0, view='atlas';
+ const initialRoute=readRoute();
+ let current = particles.find(p=>p.id===initialRoute.id) || particles[0], playing=!matchMedia('(prefers-reduced-motion: reduce)').matches, zoom=1, time=0, view='atlas';
  const canvas=$('#universeCanvas'), ctx=canvas.getContext('2d'); let W=0,H=0,dpr=1,cx=0,cy=0,R=0;
  let seed=7193; const random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};
  const stars=Array.from({length:95},()=>({x:random(),y:random(),a:random(),r:random()}));
@@ -16,38 +17,68 @@
   }).join('')||'<p class="no-result">未找到粒子，试试“电子”或 photon。</p>';
  }
  function hierarchyContext(p){
-  const names={atom:'氦原子',nucleus:'原子核',electron:'电子',proton:'质子',neutron:'中子',up:'上夸克',down:'下夸克'};
-  const paths={atom:['atom'],nucleus:['atom','nucleus'],electron:['atom','electron'],proton:['atom','nucleus','proton'],neutron:['atom','nucleus','neutron'],up:['atom','nucleus','nucleons','up'],down:['atom','nucleus','nucleons','down']};
+  const names={atom:'氦原子',nucleus:'原子核',electron:'电子',proton:'质子',neutron:'中子',up:'上夸克',down:'下夸克',gluon:'胶子'};
+  const nucleon=explorerState?.key==='neutron'?'neutron':'proton';
+  const paths={atom:['atom'],nucleus:['atom','nucleus'],electron:['atom','electron'],proton:['atom','nucleus','proton'],neutron:['atom','nucleus','neutron'],up:['atom','nucleus',nucleon,'up'],down:['atom','nucleus',nucleon,'down'],gluon:['atom','nucleus',nucleon,'gluon']};
   const notes={
-   atom:'整体：一个原子核与2个电子共同组成这个氦-4原子。',
-   nucleus:'一级组成：原子核与电子属于同一级。原子核再由质子与中子组成。',
-   electron:'一级组成，同时是基本粒子。电子与原子核共同组成原子；电子没有已知内部结构，不再展开为核子或夸克。',
-   proton:'二级组成：质子属于原子核。每颗质子的价夸克组成是2上1下。',
-   neutron:'二级组成：中子属于原子核。每颗中子的价夸克组成是1上2下。',
-   up:'三级组成：这里汇总核子中的上价夸克种类；每颗核子有自己的夸克，内部还有胶子场与夸克海。',
-   down:'三级组成：这里汇总核子中的下价夸克种类；每颗核子有自己的夸克，内部还有胶子场与夸克海。',
-   photon:'电磁相互作用的媒介。此处展示作用联系，不增加氦原子的组成层级。',
-   gluon:'胶子对应核子内部的动态强作用场。侧边位置用于展示与夸克的联系，不表示胶子处于原子外部。',
-   neutrino:'这里展示弱反应联系；中微子不是这个氦原子的常驻组成。',
+   atom:'一个原子核与2个电子共同组成这个氦-4原子。',
+   nucleus:'原子核位于原子中心，由2颗质子与2颗中子组成。',
+   electron:'电子是基本粒子，没有已知内部结构，不能再拆成核子或夸克。它在原子中以概率云描述。',
+   proton:'质子属于原子核；它的价夸克组成是2颗上夸克与1颗下夸克。',
+   neutron:'中子属于原子核；它的价夸克组成是1颗上夸克与2颗下夸克。',
+   up:'上夸克是基本粒子。核子内部还有动态胶子场与夸克海，三颗价夸克并非全部内容。',
+   down:'下夸克是基本粒子。核子内部还有动态胶子场与夸克海，三颗价夸克并非全部内容。',
+   photon:'光子传递电磁相互作用；它不是这个氦原子的常驻组成。',
+   gluon:'胶子传递强相互作用。这里的胶子场位于核子内部，与夸克持续相互作用。',
+   neutrino:'中微子参与弱相互作用，不是这个氦原子的常驻组成。',
    higgs:'希格斯场耦合关联电子和夸克的质量；希格斯玻色子不是原子的常驻组成。'
   };
   const path=paths[p.id];
-  const crumbs=path?path.map((id,i)=>id==='nucleons'?'<details class="ancestor-nucleons"><summary>核子（汇总）</summary><div class="ancestor-options"><button data-id="proton">质子</button><button data-id="neutron">中子</button></div></details>':`<button data-id="${id}" ${i===path.length-1?'aria-current="page"':''}>${names[id]}</button>`).join('<span class="ancestor-separator" aria-hidden="true">›</span>'):`<button data-id="atom">氦原子</button><span class="ancestor-separator" aria-hidden="true">↔</span><span aria-current="page">${p.name}</span>`;
-  return `<section class="hierarchy-context ${path?'':'interaction-context'}"><div class="hierarchy-context-label">${path?'组成中的位置':'相互作用与场'}</div><nav class="ancestor-path" aria-label="${path?'可点击的组成路径':'相互作用关联入口'}">${crumbs}</nav><p>${notes[p.id]}</p></section>`;
+  const crumbs=path?path.map((id,i)=>`<button data-id="${id}" ${i===path.length-1?'aria-current="page"':''}>${names[id]}</button>`).join('<span class="ancestor-separator" aria-hidden="true">›</span>'):`<span aria-current="page">${p.name}</span>`;
+  return `<section class="hierarchy-context ${path?'':'interaction-context'}"><div class="hierarchy-context-label">${path?'科学路径':'相互作用与场'}</div><nav class="ancestor-path" aria-label="${path?'可点击的组成路径':'相互作用关联入口'}">${crumbs}</nav><p>${notes[p.id]}</p></section>`;
  }
  function detail(){const p=current;
   $('#detailPanel').innerHTML=`<div class="detail-kicker"><span>PARTICLE / ${String(particles.indexOf(p)+1).padStart(2,'0')}</span><span class="tag">${p.tag}</span></div>${hierarchyContext(p)}<div class="particle-title"><div><h2>${p.title}</h2><p>${p.en}</p></div><span class="big-symbol" style="color:${p.color}">${p.symbol}</span></div><p class="detail-description">${p.desc}</p><div class="stats"><div><div class="stat-label">${p.id==='atom'||p.id==='nucleus'?'质量（示例体系）':'静止质量'}</div><div class="stat-value ${p.mass.length>14?'small':''}">${p.mass}</div><div class="stat-unit">${p.massUnit}</div></div><div><div class="stat-label">电荷</div><div class="stat-value">${p.charge}</div><div class="stat-unit">${p.chargeUnit}</div></div><div><div class="stat-label">${p.sizeLabel}</div><div class="stat-value ${p.size.length>10?'small':''}">${p.size}</div></div><div><div class="stat-label">${p.spinLabel}</div><div class="stat-value ${p.spin.length>5?'small':''}">${p.spin}</div></div></div><div class="speed-section"><div class="section-label"><svg viewBox="0 0 20 20"><path d="M3 14a8 8 0 1 1 14 0M10 10l4-4M5 15h10"/></svg> 它运动得有多快？</div><div class="speed-value" style="${p.speed.length>12?'font-size:20px':''}">${p.speed}<small>${p.speedUnit}</small></div><p class="speed-context">${p.speedContext}</p>${p.rest!==undefined?'<button class="text-link" id="openSpeed">探索能量与速度 <span>↗</span></button>':''}</div><div class="connection-section"><div class="connection-title">${['atom','nucleus','proton','neutron'].includes(p.id)?'继续深入 · 组成与联系':'相遇于此 · 相关粒子'}</div><div class="relations">${p.relations.map(id=>{const o=particles.find(x=>x.id===id);return `<button class="relation" data-id="${id}">${o.name} <span>↗</span></button>`}).join('')}</div></div><div class="insight">${p.insight}</div><button class="dive-button" id="diveBtn">${p.dive}<span>↗</span></button>`;
-  $('#diveBtn').onclick=()=>p.next==='lab'?setView('lab'):select(p.next);
+  updateDiveButton();
   if($('#openSpeed'))$('#openSpeed').onclick=()=>speedModal(p);
  }
- function select(id,hash=true){
+ function select(id,hash=true,reveal=true){
   const p=particles.find(p=>p.id===id);if(!p)return;current=p;
   if(atlasMode==='single'){zoom=1;$('#resetZoom').textContent='1.0×';}
-  list($('#search').value);detail();renderConnections();updateSceneChrome();
+  list($('#search').value);detail();renderConnections();
   canvas.setAttribute('aria-label',p.title+'的教学动画');
   if(atlasMode==='single'){canvas.classList.remove('transitioning');void canvas.offsetWidth;canvas.classList.add('transitioning');hotspots();}
-  document.querySelectorAll('.scale-stop').forEach(el=>{const active=el.dataset.id===p.id;el.classList.toggle('active',active);el.setAttribute('aria-pressed',active);});
-  relationAtlas?.setSelected(id);if(hash)history.replaceState(null,'','#'+id);
+  relationAtlas?.setSelected(id);
+  if(atlasMode==='explore'&&reveal)explorer?.reveal(id);
+  updateSceneChrome();if(hash)writeRoute();
+ }
+ function updateDiveButton(){
+  const b=$('#diveBtn');if(!b)return;
+  if(atlasMode==='explore'&&['atom','nucleus','proton','neutron'].includes(current.id)){
+   const inside=explorerState?.key===current.id;
+   const next=inside?(current.id==='atom'?'nucleus':current.id==='nucleus'?'proton':null):current.id;
+   if(next){b.innerHTML=enterLabel(next)+'<span>↗</span>';b.onclick=()=>{explorer?.setSelected(next);explorer?.enter();};return;}
+  }
+  b.innerHTML=current.dive+'<span>↗</span>';b.onclick=()=>current.next==='lab'?setView('lab'):select(current.next);
+ }
+ function readRoute(){
+  const [id,query='']=location.hash.slice(1).split('?'),params=new URLSearchParams(query);
+  return{id,mode:['explore','relations','single'].includes(params.get('mode'))?params.get('mode'):'explore',scene:params.get('scene')};
+ }
+ function writeRoute(){
+  if(restoringRoute)return;
+  if(view==='lab'){history.replaceState(null,'','#double-slit');return;}
+  const params=new URLSearchParams();if(atlasMode!=='explore')params.set('mode',atlasMode);
+  else if(explorerState?.key)params.set('scene',explorerState.key);
+  history.replaceState(null,'','#'+current.id+(params.size?'?'+params.toString():''));
+ }
+ function enterLabel(id){return({atom:'进入原子内部',nucleus:'进入原子核内部',proton:'进入质子内部',neutron:'进入中子内部'})[id]||'进入内部';}
+ function sceneChanged(snapshot){
+  explorerState=snapshot;if(atlasMode==='explore'&&Number.isFinite(snapshot.zoom)){zoom=snapshot.zoom;$('#resetZoom').textContent=zoom.toFixed(1)+'×';}
+  if(atlasMode==='explore'){
+   if(snapshot.selectedId&&snapshot.selectedId!==current.id)select(snapshot.selectedId,false,false);
+   updateSceneChrome();writeRoute();
+  }
  }
  function renderConnections(){
   const edges=graphEdges.filter(e=>e.from===current.id||e.to===current.id);
@@ -58,46 +89,68 @@
  function showEdge(edge){if(typeof edge==='string')edge=graphEdges.find(e=>e.id===edge);if(!edge)return;const a=particles.find(p=>p.id===edge.from),b=particles.find(p=>p.id===edge.to),type=graphTypes[edge.type];modal(`<div class="modal-eyebrow" style="color:${type.color}">${type.name} / RELATIONSHIP</div><h2>${a.id==='atom'?'氦原子':a.name} <span style="color:${type.color}">${edge.type==='composition'?'→':'↔'}</span> ${b.name}</h2><div class="edge-label" style="--edge-color:${type.color}">${edge.label}</div><p>${edge.description}</p><div class="insight">${type.description}</div><p>三维位置和连线用来组织知识，不对应真实粒子位置、轨道或相互作用的传播路径。</p>`);}
  document.addEventListener('click',e=>{const b=e.target.closest('[data-edge]');if(b)showEdge(b.dataset.edge);});
  function updateSceneChrome(){
-  const p=current,rel=atlasMode==='relations';
-  $('.scene-heading h1').innerHTML=rel?'一颗原子，<br class="graph-title-break">逐层展开<span>。</span>':'万物之下，<br>另有宇宙<span>。</span>';
-  $('.eyebrow').innerHTML='<span class="short-line"></span>'+ (rel?'WHOLE → PARTS / 3D ATLAS':'THE UNIVERSE WITHIN');
-  $('.scene-heading p').textContent=rel?'原子核与电子，是原子的同一级组成。':'从一颗原子出发，探索构成世界的基本粒子。';
-  $('#sceneName').textContent=rel?'整体 → 组成部分':p.title;
-  $('#sceneSubtitle').textContent=rel?'HELIUM-4 / EXPLODED HIERARCHY':p.sub;
+  const p=current,rel=atlasMode==='relations',inside=atlasMode==='explore',state=explorerState;
+  $('.scene-heading h1').innerHTML=inside?'向内，<br>再看见一个宇宙<span>。</span>':rel?'一颗原子，<br>连起微观世界<span>。</span>':'万物之下，<br>另有宇宙<span>。</span>';
+  $('.eyebrow').innerHTML='<span class="short-line"></span>'+ (inside?'A JOURNEY INWARD':rel?'CONNECTED PARTICLE ATLAS':'THE UNIVERSE WITHIN');
+  $('.scene-heading p').textContent=inside?(['proton','neutron'].includes(state?.key)?'点击夸克或胶子场，查看性质。':current.id==='electron'?'电子是基本粒子，没有已知内部结构。':['photon','neutrino','higgs'].includes(state?.key)?'独立知识入口 · 了解基本粒子的性质。':state?.key&&state.key!=='overview'?'点击眼前的粒子，继续向内探索。':'点击原子，飞入它的内部。'):rel?'拖动旋转全景 · 点击节点，发现粒子之间的联系。':'从一颗原子出发，探索构成世界的基本粒子。';
+  $('#sceneName').textContent=inside?(window.I18n?.language==='en'?(state?.titleEn||'A HELIUM-4 ATOM'):(state?.title||'氦-4原子')):rel?'11类对象 · 一张关系图':p.title;
+  $('#sceneSubtitle').textContent=inside?(state?.titleEn||'HELIUM-4 / THE JOURNEY BEGINS'):rel?'CONNECTED PARTICLES / 3D':p.sub;
   $('#sceneMode').textContent=p.scene;
-  $('#sceneNote').textContent=rel?'实线向下展开组成 · 虚线连接相互作用与场':p.note;
-  $('.model-label').textContent=rel?'拖动旋转 · 滚轮/双指缩放':'教学示意 · 非真实比例';
+  $('#sceneNote').textContent=inside?(window.I18n?.language==='en'?(state?.noteEn||'A complete helium-4 atom · Select it to enter'):(state?.note||'完整的氦-4原子 · 点击主体进入')):rel?'实线＝组成 · 虚线＝作用关系 · 星尘为氛围，非实测分布':p.note;
+  $('.model-label').textContent=inside?'结构示意 · 非等比例':rel?'拖动旋转 · 滚轮/双指缩放':'教学示意 · 非真实比例';
+  if(inside){
+   const path=state?.path||[{key:'overview',id:'atom',title:'原子之外',en:'Outside the atom'}];
+   $('#scenePath').innerHTML=path.map((step,i)=>`<button data-scene="${step.key}" ${i===path.length-1?'aria-current="step"':''}>${window.I18n?.language==='en'?step.en:step.title}</button>`).join('<span aria-hidden="true">›</span>');
+   $('#sceneBack').disabled=!state?.canBack;
+   const terminal=['electron','up','down','gluon','photon','neutrino','higgs'].includes(current.id);
+   const enter=$('#enterScene'),canEnter=state?.canEnter&&!terminal;enter.disabled=!canEnter||!!state?.transitioning;
+   $('#sceneBack').disabled=!state?.canBack||!!state?.transitioning;
+   const target=state?.selectedId==='atom'&&state?.key==='atom'?'nucleus':state?.selectedId==='nucleus'&&state?.key==='nucleus'?'proton':state?.selectedId||'atom';
+   enter.innerHTML=canEnter?enterLabel(target)+'<span>↗</span>':`<span class="entry-complete">${terminal?'基本粒子 · 无已知内部结构':'已进入内部 · 选择夸克查看详情'}</span>`;
+  }
+  updateDiveButton();
  }
- function switchMode(mode){
-  atlasMode=mode;const rel=mode==='relations';$('.universe').classList.toggle('relation-mode',rel);
+ function syncPlaying(){
+  relationAtlas?.setPlaying(atlasMode==='relations'&&view==='atlas'&&playing);
+  explorer?.setPlaying(atlasMode==='explore'&&view==='atlas'&&playing);
+ }
+ function switchMode(mode,route=true){
+  if(!['explore','relations','single'].includes(mode))return;
+  atlasMode=mode;const rel=mode==='relations',inside=mode==='explore',single=mode==='single';
+  $('.universe').classList.toggle('relation-mode',rel);$('.universe').classList.toggle('explore-mode',inside);$('.universe').classList.toggle('single-mode',single);
   $('#relationCanvas').hidden=!rel;$('#relationOverlay').hidden=!rel;$('#relationFilters').hidden=!rel;
-  canvas.hidden=rel;$('#hotspots').hidden=rel;
-  $('#relationsMode').classList.toggle('active',rel);$('#singleMode').classList.toggle('active',!rel);
-  $('#relationsMode').setAttribute('aria-pressed',rel);$('#singleMode').setAttribute('aria-pressed',!rel);
-  zoom=1;$('#resetZoom').textContent='1.0×';updateSceneChrome();
-  relationAtlas?.setPlaying(rel&&playing&&view==='atlas');if(rel){relationAtlas?.resize();relationAtlas?.setZoom(1);}else resize();
+  $('#exploreCanvas').hidden=!inside;$('#exploreOverlay').hidden=!inside;$('#scenePath').hidden=!inside;$('#exploreActions').hidden=!inside;
+  canvas.hidden=!single;$('#hotspots').hidden=!single;
+  for(const [id,key]of [['exploreMode','explore'],['relationsMode','relations'],['singleMode','single']]){const active=mode===key;$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',active);}
+  syncPlaying();
+  if(inside){if(!restoringRoute&&explorerState?.selectedId!==current.id)explorer?.reveal(current.id);explorer?.resize();zoom=explorerState?.zoom||1;}
+  else if(rel){relationAtlas?.resize();relationAtlas?.setZoom(1);zoom=1;}
+  else{zoom=1;resize();}
+  $('#resetZoom').textContent=zoom.toFixed(1)+'×';updateSceneChrome();if(route)writeRoute();
  }
- $('#relationsMode').onclick=()=>switchMode('relations');$('#singleMode').onclick=()=>switchMode('single');
+ $('#exploreMode').onclick=()=>switchMode('explore');$('#relationsMode').onclick=()=>switchMode('relations');$('#singleMode').onclick=()=>switchMode('single');
+ $('#sceneBack').onclick=()=>explorer?.back();$('#enterScene').onclick=()=>explorer?.enter();
+ $('#scenePath').addEventListener('click',e=>{const b=e.target.closest('[data-scene]');if(b)explorer?.goToScene(b.dataset.scene);});
  $('#fitGraph').onclick=()=>{relationAtlas?.reset();zoom=1;$('#resetZoom').textContent='1.0×';};
  $('#focusGraph').onclick=()=>relationAtlas?.focus(current.id);
  $('#dustToggle').onclick=()=>{const open=$('#dustPanel').hidden;$('#dustPanel').hidden=!open;$('#dustToggle').setAttribute('aria-expanded',open);};
- $('#dustAmount').oninput=e=>{const value=Number(e.target.value);$('#dustValue').textContent=value+'%';relationAtlas?.setAtmosphere(value/100);};
+ $('#dustAmount').oninput=e=>{const value=Number(e.target.value);$('#dustValue').textContent=value+'%';relationAtlas?.setAtmosphere(value/100);explorer?.setAtmosphere(value/100);};
  document.addEventListener('click',e=>{if(!e.target.closest('.dust-controls')){$('#dustPanel').hidden=true;$('#dustToggle').setAttribute('aria-expanded','false');}});
  document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{relationFilter=b.dataset.filter;relationAtlas?.setFilter(relationFilter);document.querySelectorAll('[data-filter]').forEach(el=>{const active=el===b;el.classList.toggle('active',active);el.setAttribute('aria-pressed',active);});});
  document.addEventListener('click',e=>{const b=e.target.closest('[data-id]');if(b){if(view!=='atlas')setView('atlas');select(b.dataset.id);}});
  $('#search').addEventListener('input',e=>list(e.target.value));
- function setView(v){if(v===view)return;view=v;$('#atlasView').hidden=v!=='atlas';$('#labView').hidden=v!=='lab';$('#atlasNav').classList.toggle('active',v==='atlas');$('#labNav').classList.toggle('active',v==='lab');relationAtlas?.setPlaying(v==='atlas'&&atlasMode==='relations'&&playing);if(v==='lab'){window.WaveLab.mount($('#labView'),{particle:current.id==='photon'?'photon':'electron'});history.replaceState(null,'','#double-slit');}else{window.WaveLab.unmount();history.replaceState(null,'','#'+current.id);resize();relationAtlas?.resize();}}
+ function setView(v){if(v===view)return;view=v;$('#atlasView').hidden=v!=='atlas';$('#labView').hidden=v!=='lab';$('#atlasNav').classList.toggle('active',v==='atlas');$('#labNav').classList.toggle('active',v==='lab');syncPlaying();if(v==='lab'){window.WaveLab.mount($('#labView'),{particle:current.id==='photon'?'photon':'electron'});}else{window.WaveLab.unmount();resize();relationAtlas?.resize();explorer?.resize();}writeRoute();}
  $('#atlasNav').onclick=()=>setView('atlas');$('#labNav').onclick=$('#footerLab').onclick=()=>setView('lab');$('#labView').addEventListener('wavelab:back',()=>setView('atlas'));
- function pause(){playing=!playing;$('#pauseBtn').textContent=playing?'Ⅱ':'▷';$('#pauseBtn').setAttribute('aria-label',playing?'暂停动画':'播放动画');relationAtlas?.setPlaying(playing&&view==='atlas'&&atlasMode==='relations');}
+ function pause(){playing=!playing;$('#pauseBtn').textContent=playing?'Ⅱ':'▷';$('#pauseBtn').setAttribute('aria-label',playing?'暂停动画':'播放动画');syncPlaying();}
  $('#pauseBtn').onclick=pause;if(!playing){$('#pauseBtn').textContent='▷';$('#pauseBtn').setAttribute('aria-label','播放动画');}
- function setZoom(z){zoom=Math.max(.65,Math.min(2,z));$('#resetZoom').textContent=zoom.toFixed(1)+'×';if(atlasMode==='relations')relationAtlas?.setZoom(zoom);else hotspots();}
+ function setZoom(z){zoom=Math.max(.65,Math.min(2,z));$('#resetZoom').textContent=zoom.toFixed(1)+'×';if(atlasMode==='relations')relationAtlas?.setZoom(zoom);else if(atlasMode==='explore')explorer?.setZoom(zoom);else hotspots();}
  $('#zoomIn').onclick=()=>setZoom(zoom+.15);$('#zoomOut').onclick=()=>setZoom(zoom-.15);$('#resetZoom').onclick=()=>setZoom(1);
  canvas.addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();setZoom(zoom-e.deltaY*.002);}},{passive:false});
  function modal(content){$('#modalContent').innerHTML=content;$('#modal').showModal();}
  $('#closeModal').onclick=()=>$('#modal').close();$('#modal').addEventListener('click',e=>{if(e.target===$('#modal')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('#modal').close();}});
- function guide(){modal(`<div class="modal-eyebrow">A JOURNEY INWARD</div><h2>从熟悉的物质，走进量子的世界。</h2><p>层号表示组成关系，不代表大小或基本程度；组成箭头不表示衰变。</p><p>全景把一颗氦-4原子按组成逐层展开：整体 → 原子核与电子 → 质子与中子 → 价夸克。向下表示拆开组成，不是所有粒子的大小排序。拖动旋转、滚轮缩放；点击节点或连线标签探索，右上角可切换粒子特写。</p><div class="guide-step"><b>01</b><div><strong>整体展开为原子核与电子</strong><p>氦-4原子是整体；原子核与2个电子是同一级组成。电子同时是基本粒子，没有已知内部结构，所以它的分支到此为止。原子核继续展开为2颗质子与2颗中子。</p></div></div><div class="guide-step"><b>02</b><div><strong>从核子到夸克</strong><p>每颗质子含2上1下价夸克，每颗中子含1上2下价夸克。图中上、下夸克节点汇总种类，不意味着核子共用一颗夸克。核子内部还有动态胶子场与夸克海，不能把它理解成只有3个静止小球。</p></div></div><div class="guide-step"><b>03</b><div><strong>相互作用与场，另看联系</strong><p>侧边用虚线连接电磁、强作用、弱反应与希格斯场耦合。它们是知识入口，不是新增的组成层级。胶子描述核子内部的动态强作用场；侧边排布不表示胶子在原子外。所有平台、间距和星尘均为教学视觉，非真实空间分布。</p></div></div><div class="guide-step"><b>04</b><div><strong>亲手积累一道干涉条纹</strong><p>进入双缝实验，逐个发射电子或光子，再开启路径记录，比较屏幕上的分布。</p></div></div><button class="solid-btn" id="guideStart">回到三维关系全景 →</button>`);$('#guideStart').onclick=()=>{$('#modal').close();setView('atlas');switchMode('relations');select('atom');relationAtlas?.reset();};}
+ function guide(){modal(`<div class="modal-eyebrow">A JOURNEY INWARD</div><h2>从熟悉的物质，走进量子的世界。</h2><p>从一颗完整的氦-4原子出发。点击主体，镜头飞入内部；拖动旋转，滚轮或双指缩放。顶部路径和返回按钮带你回到刚才的场景。</p><div class="guide-step"><b>01</b><div><strong>先进入原子</strong><p>原子内部有原子核和电子概率云。电子是基本粒子，没有已知内部结构，不能继续拆分。</p></div></div><div class="guide-step"><b>02</b><div><strong>再进入原子核</strong><p>这个氦-4原子核含2颗质子与2颗中子。点击其中一颗，继续进入它的内部。</p></div></div><div class="guide-step"><b>03</b><div><strong>看见夸克与胶子场</strong><p>质子含2上1下价夸克，中子含1上2下价夸克。核子还包含动态胶子场与夸克海，不能理解为只有3颗静止小球。</p></div></div><div class="guide-step"><b>04</b><div><strong>切换视角，发现联系</strong><p>关系全景保留三维星尘中的粒子网络，粒子特写展示单独对象。双缝实验则让你逐个发射电子或光子，亲手积累干涉条纹。</p></div></div><button class="solid-btn" id="guideStart">从原子开始 →</button>`);$('#guideStart').onclick=()=>{$('#modal').close();setView('atlas');switchMode('explore');explorer?.reset();};}
  $('#guideNav').onclick=$('#startJourney').onclick=guide;
- $('#sourcesBtn').onclick=()=>modal(`<div class="modal-eyebrow">SCIENCE & SOURCES</div><h2>让想象有科学的边界。</h2><p>本图谱将氦-4原子从整体向组成部分展开：原子核与电子同属一级组成；核再展开为核子，核子再展开为价夸克。层级深度表示组成路径，不表示基本程度或统一的尺寸排序。电子是基本粒子，它的分支不继续拆分。侧边虚线表示作用、反应或场耦合；胶子场存在于核子内部。平台位置、尺寸、间距、星尘与动画时间均为教学示意。电子以概率云描述，没有行星式轨道。</p><p>层号表示组成关系，不代表大小或基本程度；组成箭头不表示衰变。</p><h3>怎样理解“大小”和“速度”？</h3><p>复合粒子可用特定半径或尺度描述；基本粒子目前未发现内部结构，不能把点状图标当成实测半径。速度依状态、能量与参考系而定；数值示例会注明适用条件。</p><h3>数据与延伸阅读</h3><ul class="source-list">${window.SCIENCE_SOURCES.map(s=>`<li><a href="${s[1]}" target="_blank" rel="noopener noreferrer">${s[0]} ↗</a><br>${s[2]}</li>`).join('')}</ul><p>单位：e 为基本电荷，fm = 10⁻¹⁵ m，MeV/c² 为质量单位；自旋以 ħ 为单位。自由粒子计算采用相对论能量—动量关系。内容为入门精选，并非标准模型的完整粒子列表。</p>`);
+ $('#sourcesBtn').onclick=()=>modal(`<div class="modal-eyebrow">SCIENCE & SOURCES</div><h2>让想象有科学的边界。</h2><p>内部探索模拟从原子进入原子核、再进入核子的观察过程。放大与镜头运动用于解释组成关系，不能按画面测量真实尺度。电子是基本粒子，没有已知内部结构。核子中的三颗价夸克之外，还有动态胶子场与夸克海。关系全景中的实线表示组成，虚线表示作用、反应或场耦合；节点位置、间距和星尘是教学视觉。电子以概率云描述，没有行星式轨道。</p><p>从原子到原子核的实际尺度差异远大于画面展示；组成路径不表示粒子衰变。</p><h3>怎样理解“大小”和“速度”？</h3><p>复合粒子可用特定半径或尺度描述；基本粒子目前未发现内部结构，不能把点状图标当成实测半径。速度依状态、能量与参考系而定；数值示例会注明适用条件。</p><h3>数据与延伸阅读</h3><ul class="source-list">${window.SCIENCE_SOURCES.map(s=>`<li><a href="${s[1]}" target="_blank" rel="noopener noreferrer">${s[0]} ↗</a><br>${s[2]}</li>`).join('')}</ul><p>单位：e 为基本电荷，fm = 10⁻¹⁵ m，MeV/c² 为质量单位；自旋以 ħ 为单位。自由粒子计算采用相对论能量—动量关系。内容为入门精选，并非标准模型的完整粒子列表。</p>`);
  function speedModal(p){const photon=p.rest===0;modal(`<div class="modal-eyebrow">ENERGY → MOTION</div><h2>${p.name}能跑多快？</h2><p>${photon?'调节光子能量，观察波长变化。真空中的光速保持不变。':'调节自由粒子的动能，观察速度与德布罗意波长的变化。这里计算的是自由粒子，不是束缚态内部运动。'}</p><div class="speed-control"><label for="energy">${photon?'光子能量':'动能 K'}<span id="energyValue"></span></label><input type="range" id="energy" min="-2" max="12" step="0.05" value="${photon?'0.3':p.id==='electron'?'3':'9'}" aria-label="以对数刻度调节能量，单位电子伏特"><label><span>0.01 eV</span><span>对数刻度</span><span>1 TeV</span></label></div><div class="speed-output" aria-live="polite"><div><small>速度 v</small><strong id="velocity"></strong></div><div><small>${photon?'光子波长':'德布罗意波长'} λ</small><strong id="wavelength"></strong></div></div><div class="speed-formula">${photon?'v = c　　λ = hc / E':'E = K + mc²　　λ = h / p'}</div><p id="velocityNote"></p>`);
   const fmtE=n=>n>=1e12?(n/1e12).toFixed(2)+' TeV':n>=1e9?(n/1e9).toFixed(2)+' GeV':n>=1e6?(n/1e6).toFixed(2)+' MeV':n>=1e3?(n/1e3).toFixed(2)+' keV':n.toFixed(n<1?3:1)+' eV';
   function update(){const k=10**Number($('#energy').value),m=p.rest;const beta=photon?1:Math.sqrt(k*(k+2*m))/(k+m);const lam=1.239841984e-6/(photon?k:Math.sqrt(k*(k+2*m)));$('#energyValue').textContent=fmtE(k);$('#velocity').textContent=photon?'1.000000 c':beta>.999999?'≈ 1 c':beta<.0001?(beta*299792458).toFixed(1)+' m/s':beta.toFixed(6)+' c';$('#wavelength').textContent=lam>=1e-6?(lam/1e-6).toFixed(3)+' μm':lam>=1e-9?(lam/1e-9).toFixed(3)+' nm':lam>=1e-12?(lam/1e-12).toFixed(3)+' pm':(lam/1e-15).toFixed(3)+' fm';$('#velocityNote').textContent=photon?'在真空中，增大能量会缩短波长，速度仍为 299,792,458 m/s。':'有质量的粒子无论动能多高，速度都小于真空光速 c。高能时显示的“≈ 1 c”只是数值近似；波长不是粒子的直径。';}
@@ -132,7 +185,21 @@
  function neutrino(){const r=R*zoom;ctx.save();ctx.beginPath();ctx.rect(cx-r*1.1,cy-r*.7,r*2.2,r*1.4);ctx.clip();for(let i=0;i<50;i++){const sx=(i*.071+time*.14)%1,x=cx+(sx-.5)*r*2.8,y=cy+Math.sin(i*41.23)*r*.52;ctx.strokeStyle='#8eb6ec30';ctx.beginPath();ctx.moveTo(x-18,y);ctx.lineTo(x,y);ctx.stroke();glow(x,y,5,'#8eb6ec',.55);}ctx.restore();ctx.font='italic 42px Georgia';ctx.fillStyle='#a7caf1';ctx.textAlign='center';ctx.fillText('ν',cx,cy+15);}
  function higgs(){const r=R*zoom;for(let i=0;i<8;i++){const rr=r*(.16+i*.1);circle(cx,cy,rr,hex(current.color,.04+.08*(.5+.5*Math.sin(time-i*.8))),1);ctx.save();ctx.translate(cx,cy);ctx.scale(1,.35);circle(0,0,rr,hex(current.color,.12),1);ctx.restore();}glow(cx,cy,r*.4,current.color,.25);sphere(cx,cy,r*.12,current.color,'H');}
  let last=0;function frame(now){requestAnimationFrame(frame);if(view!=='atlas'||atlasMode!=='single'||document.hidden){last=now;return;}const dt=Math.min((now-last)/1000,.05);last=now;if(playing)time+=dt;background();if(current.id==='atom')atom();else if(current.id==='nucleus')nucleus();else if(['proton','neutron'].includes(current.id))nucleon();else if(['electron','photon'].includes(current.id))wave();else if(['up','down'].includes(current.id))quark();else if(current.id==='gluon')gluon();else if(current.id==='neutrino')neutrino();else higgs();}
- relationAtlas=window.RelationAtlas3D.mount({canvas:$('#relationCanvas'),overlay:$('#relationOverlay'),nodes:window.RELATION_NODES,edges:graphEdges,onSelect:id=>select(typeof id==='string'?id:id.id),onEdgeSelect:showEdge,onCameraChange:state=>{if(Number.isFinite(state?.zoom)){zoom=state.zoom;$('#resetZoom').textContent=zoom.toFixed(1)+'×';}}});
- select(current.id,false);switchMode('relations');requestAnimationFrame(frame);if(location.hash==='#double-slit')setView('lab');
- window.addEventListener('hashchange',()=>{const id=location.hash.slice(1);if(id==='double-slit')setView('lab');else if(particles.some(p=>p.id===id)){setView('atlas');select(id,false);}});
+ relationAtlas=window.RelationAtlas3D.mount({canvas:$('#relationCanvas'),overlay:$('#relationOverlay'),nodes:window.RELATION_NODES,edges:graphEdges,onSelect:id=>select(typeof id==='string'?id:id.id),onEdgeSelect:showEdge,onCameraChange:state=>{if(atlasMode==='relations'&&Number.isFinite(state?.zoom)){zoom=state.zoom;$('#resetZoom').textContent=zoom.toFixed(1)+'×';}}});
+ explorer=window.MicroExplorer3D.mount({canvas:$('#exploreCanvas'),overlay:$('#exploreOverlay'),onSelect:id=>select(typeof id==='string'?id:id.id,false,false),onSceneChange:sceneChanged});
+ relationAtlas.setAtmosphere(Number($('#dustAmount').value)/100);explorer.setAtmosphere(Number($('#dustAmount').value)/100);
+ function restoreRoute(route){
+  restoringRoute=true;
+  if(route.id==='double-slit'){setView('lab');restoringRoute=false;return;}
+  setView('atlas');const targetId=(particles.find(p=>p.id===route.id)||particles[0]).id;current=particles.find(p=>p.id===targetId);switchMode(route.mode,false);select(targetId,false,false);
+  if(route.mode==='explore'){
+   explorer.reveal(targetId,{animate:false});
+   if(route.scene){explorer.goToScene(route.scene,{animate:false});explorer.setSelected(targetId);explorerState=explorer.getState();}
+  }
+  updateSceneChrome();restoringRoute=false;writeRoute();
+ }
+ restoreRoute(initialRoute);requestAnimationFrame(frame);
+ window.addEventListener('hashchange',()=>restoreRoute(readRoute()));
+ window.addEventListener('popstate',()=>restoreRoute(readRoute()));
+ window.addEventListener('microcosmos:language',()=>{updateSceneChrome();});
 })();
