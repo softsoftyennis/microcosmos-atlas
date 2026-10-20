@@ -13,6 +13,7 @@
   if(!han.test(raw))return raw;
   let m;
   if((m=trimmed.match(/^(.+)，(.+)；双击聚焦$/)))return `${t(m[1])}. ${t(m[2])}. Double-click to focus.`;
+  if((m=trimmed.match(/^(.+) → (.+)：(.+)。查看关系解释$/)))return `${t(m[1])} → ${t(m[2])}: ${t(m[3])}. View relationship.`;
   if((m=trimmed.match(/^(.+)与(.+)：(.+)。查看关系解释$/)))return `${t(m[1])} ↔ ${t(m[2])}: ${t(m[3])}. View relationship.`;
   if((m=trimmed.match(/^(.+)的教学动画$/)))return `${t(m[1])} teaching animation`;
   if((m=trimmed.match(/^(.+) \/ RELATIONSHIP$/)))return `${t(m[1])} / RELATIONSHIP`;
