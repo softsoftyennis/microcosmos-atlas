@@ -8,6 +8,8 @@
 
 Microcosmos is a bilingual, interactive 3D particle atlas for classroom demonstrations and independent exploration. Start with a helium-4 atom, zoom into its nucleus and nucleons, and explore particle properties, connections and wave–particle duality through illustrative simulations.
 
+我做了这个小工具，希望让抽象的微观世界更容易观察和讨论。如果你是物理老师，课堂上有需要，欢迎下载使用，也可以分享给学生探索。如果你发现科学知识、可视化表达或教学使用上有错误或不妥之处，也欢迎通过 [GitHub Issues](https://github.com/softsoftyennis/microcosmos-atlas/issues) 指正，帮助这个项目逐步完善。
+
 ## 课堂演示建议
 
 1. **从原子出发**：展示完整氦原子，提问“原子内部有什么？”，点击进入电子概率云与原子核。
@@ -41,7 +43,9 @@ Microcosmos is a bilingual, interactive 3D particle atlas for classroom demonstr
 
 ## 本地运行
 
-无需安装依赖或构建。在本目录运行：
+在 [GitHub 项目页](https://github.com/softsoftyennis/microcosmos-atlas) 点击 **Code → Download ZIP**，下载后解压，用浏览器打开其中的 `index.html` 即可使用。请保留解压后的完整文件夹，页面通过相对路径读取同目录的脚本和样式。
+
+无需安装依赖或构建。也可以在本目录启动本地服务：
 
 ```sh
 python3 -m http.server 8000
