@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080e14">
+  <meta name="description" content="从原子到夸克，在可交互的微观宇宙中探索物质结构、粒子速度与波粒二象性。">
+  <title>微观宇宙 — 星尘三维粒子图谱</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b171d'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2379ead9'/%3E%3Cellipse cx='32' cy='32' rx='24' ry='10' transform='rotate(-40 32 32)' stroke='%2379ead9' fill='none' stroke-width='2'/%3E%3Cellipse cx='32' cy='32' rx='24' ry='10' transform='rotate(40 32 32)' stroke='%2379ead9' fill='none' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#atom" aria-label="微观宇宙首页"><svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="20" rx="18" ry="7" transform="rotate(-42 20 20)"/><ellipse cx="20" cy="20" rx="18" ry="7" transform="rotate(42 20 20)"/><circle cx="20" cy="20" r="3"/></svg><span>微观宇宙<small>MICROCOSMOS</small></span></a>
+    <nav aria-label="主要导航"><button class="nav active" id="atlasNav">探索图谱</button><button class="nav" id="labNav"><span class="nav-long">波粒二象性</span><span class="nav-short">双缝实验</span><span class="new-dot"></span></button><button class="nav" id="guideNav">探索指南</button></nav>
+    <div class="top-right"><span class="live-dot"></span><span class="tiny-label">一场向内的宇宙旅行</span><button class="icon-button" id="sourcesBtn" aria-label="科学说明与资料来源">ⓘ</button></div>
+    <button id="languageToggle" class="language-toggle" type="button" disabled data-no-i18n aria-label="Switch the page to English" title="Switch to English">EN</button>
+  </header>
+  <div id="atlasView">
+    <main class="atlas-layout">
+      <aside class="sidebar" aria-label="粒子目录">
+        <div class="index-label">物质的层次 <span>01 — 11</span></div>
+        <label class="search"><svg viewBox="0 0 20 20"><circle cx="8" cy="8" r="5"/><path d="m12 12 5 5"/></svg><input id="search" placeholder="寻找一种粒子" aria-label="搜索粒子"><kbd>/</kbd></label>
+        <div id="particleList"></div>
+        <div class="sidebar-bottom"><span class="outline-star">✧</span><p>尺度越小<br>世界越不寻常。</p><button id="startJourney">开启导览 <span>↗</span></button></div>
+      </aside>
+      <section class="universe relation-mode" aria-label="粒子动态场景">
+        <div class="scene-heading"><div class="eyebrow"><span class="short-line"></span> THE UNIVERSE WITHIN</div><h1>万物之下，<br>另有宇宙<span>。</span></h1><p>拖动旋转全景 · 点击节点，发现粒子之间的联系。</p></div>
+        <div class="view-switch" role="group" aria-label="图谱显示方式"><button id="relationsMode" class="active" aria-pressed="true">三维关系</button><button id="singleMode" aria-pressed="false">粒子特写</button></div>
+        <div class="relation-filters" id="relationFilters" role="group" aria-label="筛选关系类型"><button data-filter="all" class="active" aria-pressed="true">全部关系</button><button data-filter="composition" aria-pressed="false"><i style="background:#83e6d3"></i>组成</button><button data-filter="em" aria-pressed="false"><i style="background:#e6cd88"></i>电磁</button><button data-filter="strong" aria-pressed="false"><i style="background:#ec9fb1"></i>强作用</button><button data-filter="weak" aria-pressed="false"><i style="background:#8eb6ec"></i>弱反应</button><button data-filter="higgs" aria-pressed="false"><i style="background:#c5a7e6"></i>希格斯场</button></div>
+        <canvas id="relationCanvas" aria-label="11类粒子的三维关系全景，可拖动旋转，通过节点按钮查看详情"></canvas><div id="relationOverlay"></div>
+        <div class="dust-controls"><button id="dustToggle" aria-expanded="false" aria-controls="dustPanel">✦ 星尘 <span id="dustValue">80%</span></button><div class="dust-popover" id="dustPanel" hidden><label for="dustAmount">星尘浓度</label><input id="dustAmount" type="range" min="0" max="100" value="80" aria-label="星尘渲染浓度"><div><small>清透</small><small>璀璨</small></div><p>背景散点是视觉氛围，非实测粒子分布。</p></div></div>
+        <div class="graph-actions"><button id="fitGraph" aria-label="回到完整关系全景">⌖ 全景</button><button id="focusGraph" aria-label="聚焦当前选中的粒子">◎ 聚焦所选</button></div>
+        <div class="scene-chip"><span class="live-dot"></span><span id="sceneMode">电子概率云</span></div>
+        <canvas id="universeCanvas" aria-label="氢原子电子概率云的教学动画"></canvas>
+        <div id="hotspots"></div>
+        <div class="scene-caption"><span id="sceneName">氢原子</span><span class="caption-line"></span><span id="sceneSubtitle">HYDROGEN ATOM · 1s</span></div>
+        <div class="scene-note" id="sceneNote">亮度表示出现概率；电子没有确定的绕核运行轨道。</div>
+        <div class="scene-toolbar"><span class="model-label">教学示意 · 非真实比例</span><div class="tool-buttons"><button id="zoomOut" aria-label="缩小视图">−</button><button id="resetZoom" aria-label="重置缩放">1.0×</button><button id="zoomIn" aria-label="放大视图">＋</button><span></span><button id="pauseBtn" aria-label="暂停动画">Ⅱ</button></div></div>
+      </section>
+      <aside class="inspector" aria-label="粒子详情"><div id="detailPanel"></div></aside>
+    </main>
+    <footer class="scale-footer"><div class="scale-title"><span>尺度漫游</span><small>THE SCALE OF MATTER</small></div><div class="scale-track" id="scaleTrack"><div class="scale-line"></div><button data-id="atom" class="scale-stop active"><i></i><span>原子</span><small>10⁻¹⁰ m</small></button><button data-id="nucleus" class="scale-stop"><i></i><span>原子核</span><small>10⁻¹⁵ m</small></button><button data-id="proton" class="scale-stop"><i></i><span>核子</span><small>10⁻¹⁵ m</small></button><button data-id="up" class="scale-stop"><i></i><span>基本粒子</span><small>未发现内部结构</small></button></div><button class="footer-lab" id="footerLab"><span>从粒子走向波</span><strong>双缝实验 <span>↗</span></strong></button></footer>
+  </div>
+  <main id="labView" hidden></main>
+  <dialog id="modal"><button class="modal-close icon-button" id="closeModal" aria-label="关闭窗口">×</button><div id="modalContent"></div></dialog>
+  <script src="data.js?v=4.1"></script><script src="lab.js?v=4.1"></script><script src="relation-data.js?v=4.1"></script><script src="atmosphere.js?v=4.1"></script><script src="relations3d.js?v=4.1"></script><script src="i18n.js?v=4.1"></script><script src="translations-science.js?v=4.1"></script><script src="translations-ui.js?v=4.1"></script><script src="translations-lab.js?v=4.1"></script><script src="app.js?v=4.1"></script>
+</body>
+</html>
