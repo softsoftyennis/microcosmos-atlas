@@ -1,4 +1,12 @@
-/* Layout positions encode relationships, never measured particle locations. */
+/* An exploded composition hierarchy; positions are not measured particle locations.
+   An atom is the whole system. Nucleus and electrons are its direct components.
+   Electron elementary status is independent of its position in this hierarchy. */
+window.RELATION_LAYERS = [
+ {level:0,title:'整体 · 氦-4 原子',en:'WHOLE · HELIUM-4 ATOM',description:'一个原子核 + 2个电子',descriptionEn:'One nucleus + 2 electrons',y:4,xMin:-4.35,xMax:1.9,zMin:-1.1,zMax:1.1},
+ {level:1,title:'一级组成 · 原子核与电子',en:'LEVEL 1 · NUCLEUS & ELECTRONS',description:'两者都属于同一个原子',descriptionEn:'Both belong to the same atom',y:1.65,xMin:-4.35,xMax:1.9,zMin:-1.1,zMax:1.1},
+ {level:2,title:'展开原子核 · 质子与中子',en:'LEVEL 2 · PROTONS & NEUTRONS',description:'本例原子核含2颗质子和2颗中子',descriptionEn:'The nucleus contains 2 protons and 2 neutrons',y:-.6,xMin:-4.35,xMax:1.9,zMin:-1.1,zMax:1.1},
+ {level:3,title:'展开核子 · 上、下价夸克',en:'LEVEL 3 · VALENCE QUARKS',description:'价夸克种类汇总；核子内还有胶子场与夸克海',descriptionEn:'Valence-quark types; nucleons also contain gluon fields and a quark sea',y:-2.85,xMin:-4.35,xMax:1.9,zMin:-1.1,zMax:1.1}
+];
 window.RELATION_TYPES = {
  composition:{name:'组成关系',short:'组成',color:'#83e6d3',description:'从整体展开到组成部分。数字表示本例中的数量；夸克节点代表种类，不是同一颗夸克被多个核子共用。'},
  em:{name:'电磁相互作用',short:'电磁',color:'#e6cd88',description:'光子是电磁相互作用的媒介。电子、质子和带电夸克都参与电磁相互作用；图中只选取部分联系。'},
@@ -8,17 +16,17 @@ window.RELATION_TYPES = {
 };
 window.RELATION_NODES = window.PARTICLES.map(p=>{
  const layout={
-  atom:{position:[0,3.5,0],radius:.48,subtitle:'⁴He · 2e⁻ + 2p + 2n',kind:'atom'},
-  nucleus:{position:[0,1.35,0],radius:.39,subtitle:'2p + 2n',kind:'nucleus'},
-  electron:{position:[-3.5,2.15,1.1],radius:.23,subtitle:'电子云 · 共2个'},
-  proton:{position:[-1.65,-.65,.8],radius:.33,subtitle:'uud'},
-  neutron:{position:[1.65,-.65,-.35],radius:.33,subtitle:'udd'},
-  up:{position:[-1.65,-3.05,1],radius:.23,subtitle:'+⅔ e'},
-  down:{position:[1.65,-3.05,-.35],radius:.23,subtitle:'−⅓ e'},
-  photon:{position:[-4.7,-.25,-1.4],radius:.24,subtitle:'电磁媒介'},
-  gluon:{position:[-.1,-4.25,-2.1],radius:.24,subtitle:'强作用媒介'},
-  neutrino:{position:[4.55,2.0,.9],radius:.22,subtitle:'弱反应联系'},
-  higgs:{position:[4.7,-2.65,1.45],radius:.28,subtitle:'场的量子激发'}
+  atom:{position:[-1.3,4,0],radius:.58,subtitle:'整体 · 原子核 + 2e⁻',kind:'atom',level:0,role:'composition'},
+  nucleus:{position:[-2.3,1.65,.1],radius:.39,subtitle:'一级组成 · 2p + 2n',kind:'nucleus',level:1,role:'composition'},
+  electron:{position:[.8,1.65,.1],radius:.23,subtitle:'一级组成 · 2个电子的概率云',level:1,role:'composition'},
+  proton:{position:[-3.3,-.6,.4],radius:.33,subtitle:'二级组成 · uud',level:2,role:'composition'},
+  neutron:{position:[-1,-.6,-.3],radius:.33,subtitle:'二级组成 · udd',level:2,role:'composition'},
+  up:{position:[-3.3,-2.85,.4],radius:.23,subtitle:'核子中的价夸克 · +⅔ e',level:3,role:'composition'},
+  down:{position:[-1,-2.85,-.3],radius:.23,subtitle:'核子中的价夸克 · −⅓ e',level:3,role:'composition'},
+  photon:{position:[4.25,2.25,-.8],radius:.24,subtitle:'电磁相互作用媒介',level:null,role:'interaction'},
+  gluon:{position:[4.25,.05,-.8],radius:.24,subtitle:'核子内部的胶子场',level:null,role:'interaction'},
+  neutrino:{position:[4.25,-2.1,.3],radius:.22,subtitle:'弱反应联系 · 非原子组成',level:null,role:'interaction'},
+  higgs:{position:[4.25,-4,.3],radius:.28,subtitle:'希格斯场的量子激发',level:null,role:'interaction'}
  };
  return {id:p.id,name:p.id==='atom'?'氦原子':p.id==='nucleus'?'氦原子核':p.name,symbol:p.symbol,color:p.color,...layout[p.id]};
 });
